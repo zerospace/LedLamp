@@ -48,6 +48,7 @@ final class LedProtocol: NWProtocolFramerImplementation {
             let headerSize = LedProtocolHeader.encodedSize
             let package = framer.parseInput(minimumIncompleteLength: 0, maximumLength: 65547) { buffer, isComplete in
                 guard let buffer = buffer else { return 0 }
+                print(Data(buffer).hexDescription)
                 if Data(buffer.prefix(3)) == frameName.data(using: .utf8) {
                     packageHeader = LedProtocolHeader(buffer)
                     if let header = packageHeader {
@@ -73,7 +74,7 @@ final class LedProtocol: NWProtocolFramerImplementation {
                 response.append(body)
             }
                 
-            let crc = Array(response).crc16
+            let crc = Array(response).crc16.bigEndian
             if crc != checksum {
                 return 0
             }
@@ -99,8 +100,6 @@ final class LedProtocol: NWProtocolFramerImplementation {
         let crcData = Data(bytes: &crc, count: MemoryLayout<UInt16>.size)
         request.append(crcData)
         request.insert(contentsOf: start, at: 0)
-        
-        print(request.hexDescription)
         
         framer.writeOutput(data: request)
     }

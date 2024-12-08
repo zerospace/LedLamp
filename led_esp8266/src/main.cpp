@@ -2,6 +2,7 @@
 #include <ESP8266mDNS.h>
 #include "WiFiConfig.h"
 #include "packet/Packet.h"
+#include <string.h>
 
 const int redPinA = D0;
 const int redPinB = D1;
@@ -70,22 +71,29 @@ void loop() {
         
         Packet packet;
         if (parser.parse(buffer, length, &packet) == 0) {
+          length = 0;
+          memset(buffer, 0, PACKET_MAX_SIZE);
           Serial.println(packet.command);
           switch (packet.type) {
             case Command:
             switch (packet.command) {
               case Info:
-              Serial.println(packet.data);
-              Serial.println(sizeof(packet.data));
-              break;
+                Packet packet;
+                packet.type = Response;
+                packet.command = Info;
+                char string[19] = "Hello from esp8266";
+                strncpy(packet.data, string, 19);
+                char buffer[PACKET_MAX_SIZE];
+                size_t buffer_size = 0;
+                parser.serialize(packet, buffer, buffer_size);
+                client.write(buffer, buffer_size);
+                break;
             }
             break;
 
             case Response:
             break;
           }
-
-          length = 0;
         }
       }
     delay(10);

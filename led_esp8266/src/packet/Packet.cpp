@@ -40,21 +40,25 @@ int Parser::parse(const char* buffer, size_t length, Packet *packet) {
     return 0;
 }
 
-void Parser::buffer(Packet *packet, char *buffer) {
+void Parser::serialize(Packet &packet, char *buffer, size_t &size) {
     size_t offset = 0;
     memcpy(buffer, "LED", 3);
     offset += 3;
 
-    buffer[offset++] = packet->type;
-    buffer[offset++] = packet->command;
-    buffer[offset++] = sizeof(packet->data);
+    buffer[offset++] = static_cast<uint8_t>(packet.type);
+    buffer[offset++] = static_cast<uint8_t>(packet.command);
 
-    memcpy(buffer + offset, packet->data, sizeof(packet->data));
-    offset += sizeof(packet->data);
+    uint8_t data_size = strnlen(packet.data, sizeof(packet.data));
+    buffer[offset++] = data_size;
 
-    uint16_t packet_crc = crc(&buffer[3], 3 + sizeof(packet->data));
-    buffer[offset++] = (packet_crc >> 8) && 0xFF;
-    buffer[offset++] = packet_crc && 0xFF;
+    memcpy(buffer + offset, packet.data, data_size);
+    offset += data_size;
+
+    uint16_t packet_crc = crc(&buffer[3], 3 + data_size);
+    buffer[offset++] = (packet_crc >> 8) & 0xFF;
+    buffer[offset++] = packet_crc & 0xFF;
+
+    size = offset;
 }
 
 uint16_t Parser::crc(const char *data, size_t length) {

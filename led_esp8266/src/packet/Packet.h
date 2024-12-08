@@ -22,7 +22,7 @@ struct Packet {
 class Parser {
     public:
         int parse(const char* buffer, size_t length, Packet *packet);
-        void buffer(Packet *packet, char *buffer);
+        void serialize(Packet &packet, char *buffer, size_t &size);
     
     private:
         uint16_t crc(const char *data, size_t length);
