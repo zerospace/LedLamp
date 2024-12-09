@@ -14,7 +14,8 @@ final class LedProtocol: NWProtocolFramerImplementation {
     
     enum Command: UInt8 {
         case invalid = 0x00
-        case info = 0xAA
+        case get = 0xAA
+        case set = 0xBB
     }
     
     enum MessageType: UInt8 {
@@ -48,7 +49,6 @@ final class LedProtocol: NWProtocolFramerImplementation {
             let headerSize = LedProtocolHeader.encodedSize
             let package = framer.parseInput(minimumIncompleteLength: 0, maximumLength: 65547) { buffer, isComplete in
                 guard let buffer = buffer else { return 0 }
-                print(Data(buffer).hexDescription)
                 if Data(buffer.prefix(3)) == frameName.data(using: .utf8) {
                     packageHeader = LedProtocolHeader(buffer)
                     if let header = packageHeader {

@@ -2,28 +2,41 @@
 #include <ESP8266mDNS.h>
 #include "WiFiConfig.h"
 #include "packet/Packet.h"
-#include <string.h>
+#include <memory.h>
+#include "State.h"
 
-const int redPinA = D0;
-const int redPinB = D1;
+const int num_leds = 60;
+const int led_pin = D7;
 
-volatile uint8_t red = 255;
-volatile uint8_t green = 244;
-volatile uint8_t blue = 229;
-volatile uint8_t brightness = 0;
-int lastRedEncoded = 0;
+const int red_pin_A = D0;
+const int red_pin_B = D1;
 
+State state;
+CRGB leds[num_leds];
 WiFiServer server(12345);
 Parser parser;
 
+byte rainbow_counter;
+
 // Forward declarations
-void updateRedEncoder();
 void updateEncoder(int pinA, int pinB, int &lastEncoded, volatile uint8_t &value);
 
 void setup() {
   Serial.begin(9600);
   delay(10);
   Serial.println("\n");
+
+  state.red = 255;
+  state.green = 244;
+  state.blue = 229;
+  state.brightness = 128;
+  state.mode = Color;
+  state.temperature = Tungsten100W;
+
+  FastLED.addLeds<WS2812, led_pin, GRB>(leds, num_leds).setCorrection(TypicalSMD5050);
+
+  pinMode(red_pin_A, INPUT_PULLUP);
+  pinMode(red_pin_B, INPUT_PULLUP);
 
   WiFi.begin(SSID, PASSWORD);
   Serial.print("Connecting to ");
@@ -49,10 +62,6 @@ void setup() {
   MDNS.addService("lamp", "tcp", 12345);
 
   server.begin();
-
-  // Set encoders pins
-  pinMode(redPinA, INPUT_PULLUP);
-  pinMode(redPinB, INPUT_PULLUP);
 }
 
 void loop() {
@@ -73,26 +82,33 @@ void loop() {
         if (parser.parse(buffer, length, &packet) == 0) {
           length = 0;
           memset(buffer, 0, PACKET_MAX_SIZE);
-          Serial.println(packet.command);
           switch (packet.type) {
             case Command:
-            switch (packet.command) {
-              case Info:
-                Packet packet;
-                packet.type = Response;
-                packet.command = Info;
-                char string[19] = "Hello from esp8266";
-                strncpy(packet.data, string, 19);
-                char buffer[PACKET_MAX_SIZE];
-                size_t buffer_size = 0;
-                parser.serialize(packet, buffer, buffer_size);
-                client.write(buffer, buffer_size);
-                break;
-            }
-            break;
+              switch (packet.command) {
+                case SetState:
+                  deserialize_state(packet.data, state);
+                  Serial.println(state.red);
+                  break;
+                  
+                case GetState:
+                  Packet p;
+                  p.type = Response;
+                  p.command = GetState;
+
+                  size_t state_buffer_size = 0;
+                  state_serialize(state, p.data, state_buffer_size);
+
+                  char buffer[PACKET_MAX_SIZE];
+                  size_t buffer_size = 0;
+                  parser.serialize(p, state_buffer_size, buffer, buffer_size);
+
+                  client.write(buffer, buffer_size);
+                  break;
+              }
+              break;
 
             case Response:
-            break;
+              break;
           }
         }
       }
@@ -101,17 +117,28 @@ void loop() {
     client.stop();
     Serial.println("Client disconnected");
   }
-  updateRedEncoder();
-}
 
-void updateRedEncoder() {
-  static int lastRedPos = -1;
-  updateEncoder(redPinA, redPinB, lastRedEncoded, red);
-  if (red != lastRedPos) {
-    Serial.print("Red: ");
-    Serial.println(red);
-    lastRedPos = red;
+  switch (state.mode) {
+    case Rainbow:
+      for (int i =0; i<num_leds; i++) {
+        leds[i] = CHSV(rainbow_counter + i * 2, 255, 255);
+      }
+      rainbow_counter++;
+      break;
+
+    case Color:
+      for (int i = 0; i<num_leds; i++) {
+        leds[i].red = state.red;
+        leds[i].green = state.green;
+        leds[i].blue = state.blue;
+      }
+      break;
   }
+
+  FastLED.setBrightness(state.brightness);
+  FastLED.setTemperature(state.temperature);
+  FastLED.show();
+  FastLED.delay(8);
 }
 
 void updateEncoder(int pinA, int pinB, int &lastEncoded, volatile uint8_t &value) {

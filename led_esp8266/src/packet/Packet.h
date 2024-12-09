@@ -10,7 +10,8 @@ typedef enum PacketType: uint8_t {
 } PacketType;
 
 typedef enum Function: uint8_t {
-    Info = 0xAA
+    GetState = 0xAA,
+    SetState = 0xBB
 } Function;
 
 struct Packet {
@@ -22,7 +23,7 @@ struct Packet {
 class Parser {
     public:
         int parse(const char* buffer, size_t length, Packet *packet);
-        void serialize(Packet &packet, char *buffer, size_t &size);
+        void serialize(Packet &packet, uint8_t data_size, char *buffer, size_t &size);
     
     private:
         uint16_t crc(const char *data, size_t length);

@@ -1,5 +1,6 @@
 #include "Packet.h"
 #include <memory.h>
+#include <Arduino.h>
 
 int Parser::parse(const char* buffer, size_t length, Packet *packet) {
     if (length < PACKET_MIN_SIZE) {
@@ -40,15 +41,13 @@ int Parser::parse(const char* buffer, size_t length, Packet *packet) {
     return 0;
 }
 
-void Parser::serialize(Packet &packet, char *buffer, size_t &size) {
+void Parser::serialize(Packet &packet, uint8_t data_size, char *buffer, size_t &size) {
     size_t offset = 0;
     memcpy(buffer, "LED", 3);
     offset += 3;
 
     buffer[offset++] = static_cast<uint8_t>(packet.type);
     buffer[offset++] = static_cast<uint8_t>(packet.command);
-
-    uint8_t data_size = strnlen(packet.data, sizeof(packet.data));
     buffer[offset++] = data_size;
 
     memcpy(buffer + offset, packet.data, data_size);

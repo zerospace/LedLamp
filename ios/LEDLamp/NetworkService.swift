@@ -8,7 +8,9 @@
 import Foundation
 import Network
 
-final class NetworkService {
+final class NetworkService: ObservableObject {
+    @Published var state = LampState(red: 0, green: 0, blue: 0, brightness: 0, mode: .color, temperature: .tungsten100W)
+    
     private let browser = NWBrowser(for: .bonjour(type: LedProtocol.serviceName, domain: "local."), using: .tcp)
     private var connection: NWConnection?
     
@@ -58,17 +60,28 @@ final class NetworkService {
             print(state)
             if case .ready = state {
                 self.receiveMessageLoop()
+                self.command(.get)
             }
         }
         connection?.start(queue: .main)
-        print(connection!)
     }
     
     private func receiveMessageLoop() {
         connection?.receiveMessage { content, contentContext, isComplete, error in
-            if let decodedMessage = contentContext?.protocolMetadata(definition: LedProtocol.definition) as? NWProtocolFramer.Message {
-//                self.message(.success(decodedMessage))
-                print(decodedMessage)
+            if let message = contentContext?.protocolMetadata(definition: LedProtocol.definition) as? NWProtocolFramer.Message {
+                switch message.header.messageType {
+                case .command:
+                    break
+                case .response:
+                    if case .get = message.header.function, let data = message.data {
+                        do {
+                            self.state = try LampState.deserialize(data)
+                        }
+                        catch { print(error) }
+                    }
+                case .invalid:
+                    break
+                }
             }
             
             if let err = error {
