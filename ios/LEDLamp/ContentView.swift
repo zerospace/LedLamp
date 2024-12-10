@@ -12,92 +12,65 @@ struct ContentView: View {
     
     private let network = NetworkService()
     
-    @State private var red: Double = 0.0
-    @State private var green: Double = 0.0
-    @State private var blue: Double = 0.0
-    @State private var brightness: Double = 0.0
-    @State private var color: Color = .white
-    
-    @State private var isSliderEditinig = false
-    
-    @State private var mode: LampState.Mode = .color
-    @State private var temperature: ColorTemperature = .tungsten100W
+    @State private var state: LampState = .init(red: 0.0, green: 0.0, blue: 0.0, brightness: 0.0, mode: .color, temperature: .tungsten100W)
+    @State private var color: Color = .red
     
     var body: some View {
         Form {
-            Section(header:
-                HStack {
-                    Spacer()
-//                    Circle()
-//                        .fill(.red)
-//                        .stroke(.black)
-//                        .frame(width: 128.0)
-                CircularColorPicker(color: $color).padding()
-                    Spacer()
-                }
-            ) {
+            Section(header: CircularColorPicker(color: $color).padding()) {
                 HStack {
                     Text("R")
-                    Slider(value: $red, in: 0...255, step: 1) { editing in
-                        isSliderEditinig = editing
-                        if !editing {
-                            network.state.red = UInt8(red)
-                            network.command(.set, data: network.state.data)
+                    Slider(value: $state.red, in: 0...255, step: 1)
+                        .onChange(of: state.red) { oldValue, newValue in
+                            color = Color(red: Double(newValue) / 255, green: Double(state.green) / 255, blue: Double(state.blue) / 255)
+                            network.command(.set, data: state.data)
                         }
-                    }
-                    .onChange(of: red) { oldValue, newValue in
-                        color = Color(red: Double(newValue) / 255, green: Double(green) / 255, blue: Double(blue) / 255)
-                    }
                 }
                 
                 HStack {
                     Text("G")
-                    Slider(value: $green, in: 0...255, step: 1) { editing in
-                        isSliderEditinig = editing
-                        if !editing {
-                            network.state.green = UInt8(green)
-                            network.command(.set, data: network.state.data)
+                    Slider(value: $state.green, in: 0...255, step: 1)
+                        .onChange(of: state.green) { oldValue, newValue in
+                            color = Color(red: Double(state.red) / 255, green: Double(newValue) / 255, blue: Double(state.blue) / 255)
+                            network.command(.set, data: state.data)
                         }
-                    }
-                    .onChange(of: green) { oldValue, newValue in
-                        color = Color(red: Double(red) / 255, green: Double(newValue) / 255, blue: Double(blue) / 255)
-                    }
                 }
                 
                 HStack {
                     Text("B")
-                    Slider(value: $blue, in: 0...255, step: 1) { editing in
-                        isSliderEditinig = editing
-                        if !editing {
-                            network.state.blue = UInt8(blue)
-                            network.command(.set, data: network.state.data)
+                    Slider(value: $state.blue, in: 0...255, step: 1)
+                        .onChange(of: state.blue) { oldValue, newValue in
+                            color = Color(red: Double(state.red) / 255, green: Double(state.green) / 255, blue: Double(newValue) / 255)
+                            network.command(.set, data: state.data)
                         }
-                    }
-                    .onChange(of: blue) { oldValue, newValue in
-                        color = Color(red: Double(red) / 255, green: Double(green) / 255, blue: Double(newValue) / 255)
-                    }
                 }
             }
             
             
             Section(header: Text("Brightness")) {
-                Slider(value: $brightness, in: 0...255, step: 1) { _ in
-                    network.state.brightness = UInt8(brightness)
-                    network.command(.set, data: network.state.data)
-                }
+                Slider(value: $state.brightness, in: 0...255, step: 1)
+                    .onChange(of: state.brightness) { oldValue, newValue in
+                        network.command(.set, data: state.data)
+                    }
             }
             
             Section {
-                Picker("Mode", selection: $mode) {
+                Picker("Mode", selection: $state.mode) {
                     ForEach(LampState.Mode.allCases, id: \.self) {
                         Text($0.name)
                     }
                 }
+                .onChange(of: state.mode) { oldValue, newValue in
+                    network.command(.set, data: state.data)
+                }
                 
-                Picker("Color Temperature", selection: $temperature) {
+                Picker("Color Temperature", selection: $state.temperature) {
                     ForEach(ColorTemperature.allCases, id: \.self) {
                         Text($0.name)
                     }
+                }
+                .onChange(of: state.temperature) { oldValue, newValue in
+                    network.command(.set, data: state.data)
                 }
             }
         }
@@ -105,21 +78,13 @@ struct ContentView: View {
             network.search()
         }
         .onReceive(network.$state) { state in
-            red = Double(state.red)
-            green = Double(state.green)
-            blue = Double(state.blue)
-            brightness = Double(state.brightness)
+            self.state = state
         }
         .onChange(of: color) { oldValue, newValue in
-//            if !isSliderEditinig {
-                let resolvedColor = newValue.resolve(in: environment)
-                red = Double(resolvedColor.red) * 255
-                network.state.red = UInt8(red)
-                green = Double(resolvedColor.green) * 255
-                network.state.green = UInt8(green)
-                blue = Double(resolvedColor.blue) * 255
-                network.state.blue = UInt8(blue)
-//            }
+            let resolvedColor = newValue.resolve(in: environment)
+            state.red = Double(resolvedColor.red) * 255
+            state.green = Double(resolvedColor.green) * 255
+            state.blue = Double(resolvedColor.blue) * 255
         }
     }
 }
