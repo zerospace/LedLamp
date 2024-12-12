@@ -70,16 +70,14 @@ final class NetworkService: ObservableObject {
         connection?.receiveMessage { content, contentContext, isComplete, error in
             if let message = contentContext?.protocolMetadata(definition: LedProtocol.definition) as? NWProtocolFramer.Message {
                 switch message.header.messageType {
-                case .command:
-                    break
                 case .response:
                     if case .get = message.header.function, let data = message.data {
                         do {
                             self.state = try LampState.deserialize(data)
                         }
-                        catch { print(error) }
+                        catch { print(error) }  
                     }
-                case .invalid:
+                default:
                     break
                 }
             }

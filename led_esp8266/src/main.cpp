@@ -1,30 +1,31 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ESPAsyncTCP.h>
 #include "WiFiConfig.h"
 #include "packet/Packet.h"
 #include <memory.h>
 #include "State.h"
 
 const int num_leds = 60;
-const int led_pin = D7;
-
-const int red_pin_A = D0;
-const int red_pin_B = D1;
 
 State state;
 CRGB leds[num_leds];
-WiFiServer server(12345);
+AsyncServer server(12345);
 Parser parser;
 
-byte rainbow_counter;
+uint8_t rainbow_counter;
+uint8_t last_red_state = 0;
+uint8_t last_green_state = 0;
+uint8_t last_blue_state = 0;
+uint8_t last_bright_state = 0;
+bool need_update_led = true;
 
 // Forward declarations
-void updateEncoder(int pinA, int pinB, int &lastEncoded, volatile uint8_t &value);
+void send(State &state, PacketType type, Function command, AsyncClient *client);
 
 void setup() {
   Serial.begin(9600);
   delay(10);
-  Serial.println("\n");
 
   state.red = 255;
   state.green = 244;
@@ -33,90 +34,46 @@ void setup() {
   state.mode = Color;
   state.temperature = Tungsten100W;
 
-  FastLED.addLeds<WS2812, led_pin, GRB>(leds, num_leds).setCorrection(TypicalSMD5050);
-
-  pinMode(red_pin_A, INPUT_PULLUP);
-  pinMode(red_pin_B, INPUT_PULLUP);
+  FastLED.addLeds<WS2812, D7, GRB>(leds, num_leds).setCorrection(TypicalLEDStrip);
 
   WiFi.begin(SSID, PASSWORD);
-  Serial.print("Connecting to ");
-  Serial.print(SSID);
-  Serial.println(" ...");
-
-  int i = 0;
-  while(WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(++i);
-    Serial.print(" ");
-  }
-
-  Serial.println("\n");
-  Serial.println("Connection established!");
-  Serial.print("IP address:\t");
-  Serial.println(WiFi.localIP());
-
-  if (!MDNS.begin("esp8266")) {
-    Serial.println("Error setting up MDNS responder!");
-  }
-  Serial.println("mDNS responder started");
+  MDNS.begin("esp8266");
   MDNS.addService("lamp", "tcp", 12345);
 
+  server.onClient([](void *arg, AsyncClient *client) {
+    client->onData([](void *arg, AsyncClient *client, void *data, size_t length) {
+      char* buffer = static_cast<char*>(data);
+      Packet packet;
+      if (parser.parse(buffer, length, &packet) == 0) {
+        switch (packet.type) {
+          case Command:
+            switch (packet.command) {
+              case SetState:
+                deserialize_state(packet.data, state);
+                need_update_led = true;
+                break;
+
+              case GetState:
+                send(state, Response, GetState, client);
+                break;
+            }
+            break;
+
+          case Response:
+            break;
+        }
+      }
+    }, nullptr);
+
+    client->onDisconnect([](void *arg, AsyncClient *client) {
+      delete client;
+    }, nullptr);
+  }, nullptr);
   server.begin();
 }
 
 void loop() {
   MDNS.update();
-
-  WiFiClient client = server.accept();
-  if (client) {
-    Serial.println("New client connected");
-
-    size_t length = 0;
-    char buffer[PACKET_MAX_SIZE];
-
-    while (client.connected()) {
-      if(client.available()) {
-        buffer[length++] = client.read();
-        
-        Packet packet;
-        if (parser.parse(buffer, length, &packet) == 0) {
-          length = 0;
-          memset(buffer, 0, PACKET_MAX_SIZE);
-          switch (packet.type) {
-            case Command:
-              switch (packet.command) {
-                case SetState:
-                  deserialize_state(packet.data, state);
-                  Serial.println(state.red);
-                  break;
-                  
-                case GetState:
-                  Packet p;
-                  p.type = Response;
-                  p.command = GetState;
-
-                  size_t state_buffer_size = 0;
-                  state_serialize(state, p.data, state_buffer_size);
-
-                  char buffer[PACKET_MAX_SIZE];
-                  size_t buffer_size = 0;
-                  parser.serialize(p, state_buffer_size, buffer, buffer_size);
-
-                  client.write(buffer, buffer_size);
-                  break;
-              }
-              break;
-
-            case Response:
-              break;
-          }
-        }
-      }
-    delay(10);
-    }
-    client.stop();
-    Serial.println("Client disconnected");
-  }
 
   switch (state.mode) {
     case Rainbow:
@@ -137,24 +94,24 @@ void loop() {
 
   FastLED.setBrightness(state.brightness);
   FastLED.setTemperature(state.temperature);
-  FastLED.show();
-  FastLED.delay(8);
+  if (need_update_led) {
+    FastLED.show();
+    FastLED.delay(20);
+    need_update_led = false;
+  }
 }
 
-void updateEncoder(int pinA, int pinB, int &lastEncoded, volatile uint8_t &value) {
-  int msb = digitalRead(pinA); // most significant bit
-  int lsb = digitalRead(pinB); // least significnt bit
+void send(State &state, PacketType type, Function command, AsyncClient *client) {
+  Packet packet;
+  packet.type = type;
+  packet.command = command;
 
-  int encoded = (msb << 1) | lsb; // convert to single number
-  int sum = (lastEncoded << 2) | encoded; 
+  size_t state_buffer_size = 0;
+  state_serialize(state, packet.data, state_buffer_size);
 
-  if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) {
-    value = min(value + 1, 255);
-  }
+  char buffer[PACKET_MAX_SIZE];
+  size_t buffer_size = 0;
+  parser.serialize(packet, state_buffer_size, buffer, buffer_size);
 
-  if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
-    value = max(0, value - 1);
-  }
-
-  lastEncoded = encoded;
+  client->write(buffer, buffer_size);
 }

@@ -101,7 +101,10 @@ struct CircularColorPicker: View {
                 }
                 
             }
-            .onChange(of: color) { oldValue, newValue in
+            .onAppear {
+                UIColor(color).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
+            }
+            .valueChanged(color) { newValue in
                 UIColor(newValue).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
             }
         }
