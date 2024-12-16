@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
     private let network = NetworkService()
     
-    @State private var state: LampState = .init(red: 0.0, green: 0.0, blue: 0.0, brightness: 0.0, mode: .color, temperature: .tungsten100W)
+    @State private var state: LampState = .init(red: 0.0, green: 0.0, blue: 0.0, mode: .color)
     @State private var color: Color = .red
     
     var body: some View {
@@ -51,14 +51,6 @@ struct ContentView: View {
                     }
                 }
                 
-                
-                Section(header: Text("Brightness")) {
-                    Slider(value: $state.brightness, in: 0...255, step: 1)
-                        .valueChanged(state.brightness) { _ in
-                            network.command(.set, data: state.data)
-                        }
-                }
-                
                 Section {
                     Picker("Mode", selection: $state.mode) {
                         ForEach(LampState.Mode.allCases, id: \.self) {
@@ -66,15 +58,6 @@ struct ContentView: View {
                         }
                     }
                     .valueChanged(state.mode) { _ in
-                        network.command(.set, data: state.data)
-                    }
-                    
-                    Picker("Color Temperature", selection: $state.temperature) {
-                        ForEach(ColorTemperature.allCases, id: \.self) {
-                            Text($0.name)
-                        }
-                    }
-                    .valueChanged(state.temperature) { _ in
                         network.command(.set, data: state.data)
                     }
                 }

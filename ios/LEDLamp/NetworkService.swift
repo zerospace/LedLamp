@@ -9,7 +9,7 @@ import Foundation
 import Network
 
 final class NetworkService: ObservableObject {
-    @Published var state = LampState(red: 0, green: 0, blue: 0, brightness: 0, mode: .color, temperature: .tungsten100W)
+    @Published var state = LampState(red: 0, green: 0, blue: 0, mode: .color)
     
     private let browser = NWBrowser(for: .bonjour(type: LedProtocol.serviceName, domain: "local."), using: .tcp)
     private var connection: NWConnection?

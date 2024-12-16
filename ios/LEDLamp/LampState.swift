@@ -27,20 +27,14 @@ struct LampState {
     var red: Double
     var green: Double
     var blue: Double
-    var brightness: Double
     var mode: Mode
-    var temperature: ColorTemperature
     
     var data: Data {
         var buffer = Data()
         buffer.append(UInt8(red))
         buffer.append(UInt8(green))
         buffer.append(UInt8(blue))
-        buffer.append(UInt8(brightness))
         buffer.append(mode.rawValue)
-        buffer.append(UInt8((temperature.rawValue >> 16) & 0xFF))
-        buffer.append(UInt8((temperature.rawValue >> 8) & 0xFF))
-        buffer.append(UInt8(temperature.rawValue & 0xFF))
         return buffer
     }
     
@@ -52,12 +46,7 @@ struct LampState {
         offset += 1
         let blue = data[offset]
         offset += 1
-        let brightness = data[offset]
-        offset += 1
         guard let mode = LampState.Mode(rawValue: data[offset]) else { throw LampState.Error.invalidMode }
-        offset += 1
-        let temperature = Int(data[offset]) << 16 | Int(data[offset + 1]) << 8 | Int(data[offset + 2])
-        guard let colorTemperature = ColorTemperature(rawValue: temperature) else { throw LampState.Error.invalidTemperature }
-        return LampState(red: Double(red), green: Double(green), blue: Double(blue), brightness: Double(brightness), mode: mode, temperature: colorTemperature)
+        return LampState(red: Double(red), green: Double(green), blue: Double(blue), mode: mode)
     }
 }

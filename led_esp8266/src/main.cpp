@@ -5,20 +5,19 @@
 #include "packet/Packet.h"
 #include <memory.h>
 #include "State.h"
+#include <NeoPixelBus.h>
 
 const int num_leds = 60;
 
 State state;
-CRGB leds[num_leds];
+NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBangWs2812xMethod> strip(num_leds, D7);
+RgbColor currentColor(255, 244, 229);
+float animationProgress = 0.0;
+const float animationStep = 0.02;
 AsyncServer server(12345);
 Parser parser;
 
-uint8_t rainbow_counter;
-uint8_t last_red_state = 0;
-uint8_t last_green_state = 0;
-uint8_t last_blue_state = 0;
-uint8_t last_bright_state = 0;
-bool need_update_led = true;
+float rainbow_counter = 0.0;
 
 // Forward declarations
 void send(State &state, PacketType type, Function command, AsyncClient *client);
@@ -30,11 +29,10 @@ void setup() {
   state.red = 255;
   state.green = 244;
   state.blue = 229;
-  state.brightness = 128;
   state.mode = Color;
-  state.temperature = Tungsten100W;
 
-  FastLED.addLeds<WS2812, D7, GRB>(leds, num_leds).setCorrection(TypicalLEDStrip);
+  strip.Begin();
+  strip.Show();
 
   WiFi.begin(SSID, PASSWORD);
   MDNS.begin("esp8266");
@@ -50,7 +48,7 @@ void setup() {
             switch (packet.command) {
               case SetState:
                 deserialize_state(packet.data, state);
-                need_update_led = true;
+                animationProgress = 0.0;
                 break;
 
               case GetState:
@@ -78,27 +76,26 @@ void loop() {
   switch (state.mode) {
     case Rainbow:
       for (int i =0; i<num_leds; i++) {
-        leds[i] = CHSV(rainbow_counter + i * 2, 255, 255);
+        float hue = fmod(rainbow_counter + (float)i * 0.01, 1.0);
+        HsbColor color(hue, 1.0, 1.0);
+        strip.SetPixelColor(i, color);
       }
-      rainbow_counter++;
+      rainbow_counter += 0.01;
       break;
 
     case Color:
+      if (animationProgress  < 1.0) {
+        currentColor = RgbColor::LinearBlend(currentColor, RgbColor(state.red, state.green, state.blue), animationProgress);
+        animationProgress += animationStep;
+      }
       for (int i = 0; i<num_leds; i++) {
-        leds[i].red = state.red;
-        leds[i].green = state.green;
-        leds[i].blue = state.blue;
+        strip.SetPixelColor(i, currentColor);
       }
       break;
   }
 
-  FastLED.setBrightness(state.brightness);
-  FastLED.setTemperature(state.temperature);
-  if (need_update_led) {
-    FastLED.show();
-    FastLED.delay(20);
-    need_update_led = false;
-  }
+  strip.Show();
+  delay(20);
 }
 
 void send(State &state, PacketType type, Function command, AsyncClient *client) {
