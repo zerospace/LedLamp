@@ -21,7 +21,6 @@ struct LampState {
     
     enum Error: LocalizedError {
         case invalidMode
-        case invalidTemperature
     }
     
     var red: Double
