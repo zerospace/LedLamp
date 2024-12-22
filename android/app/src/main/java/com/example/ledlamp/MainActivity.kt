@@ -1,16 +1,22 @@
 package com.example.ledlamp
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -23,18 +29,24 @@ import com.example.ledlamp.ui.theme.LedLampTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 class MainActivity : ComponentActivity() {
+    private lateinit var networkService: NetworkService
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        networkService = NetworkService(this)
+        networkService.search()
+
         enableEdgeToEdge()
         setContent {
             LedLampTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     val color = remember { mutableStateOf(Color.Red) }
-                    var red = remember { mutableFloatStateOf(0f) }
-                    var green = remember { mutableFloatStateOf(0f) }
-                    var blue = remember { mutableFloatStateOf(0f) }
+                    val state = remember { mutableStateOf(LampState()) }
+                    var isModePickerExpanded = remember { mutableStateOf(false) }
 
                     Column(
                         modifier = Modifier
@@ -48,20 +60,18 @@ class MainActivity : ComponentActivity() {
                             contentAlignment = Alignment.Center
                         ) {
                             CircularColorPicker(color) { newColor ->
-                                red.floatValue = newColor.red * 255
-                                green.floatValue = newColor.green * 255
-                                blue.floatValue = newColor.blue * 255
+                                state.value = state.value.copy(red = newColor.red * 255, green = newColor.green * 255, blue = newColor.blue * 255)
                             }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("R", fontSize = 17.sp)
                             Slider(
-                                value = red.floatValue,
+                                value = state.value.red,
                                 valueRange = 0f..255f,
                                 onValueChange = { value ->
-                                    red.floatValue = value
-                                    color.value = Color(red.floatValue / 255f, green.floatValue / 255f, blue.floatValue /255f)
+                                    state.value = state.value.copy(red = value)
+                                    color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
                                 onValueChangeFinished =  {}
                             )
@@ -70,11 +80,11 @@ class MainActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("G", fontSize = 17.sp)
                             Slider(
-                                value = green.floatValue,
+                                value = state.value.green,
                                 valueRange = 0f..255f,
                                 onValueChange = { value ->
-                                    green.floatValue = value
-                                    color.value = Color(red.floatValue / 255f, green.floatValue / 255f, blue.floatValue /255f)
+                                    state.value = state.value.copy(green = value)
+                                    color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
                                 onValueChangeFinished =  {}
                             )
@@ -83,18 +93,56 @@ class MainActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("B", fontSize = 17.sp)
                             Slider(
-                                value = blue.floatValue,
+                                value = state.value.blue,
                                 valueRange = 0f..255f,
                                 onValueChange = { value ->
-                                    blue.floatValue = value
-                                    color.value = Color(red.floatValue / 255f, green.floatValue / 255f, blue.floatValue /255f)
+                                    state.value = state.value.copy(blue = value)
+                                    color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
                                 onValueChangeFinished =  {}
                             )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp)
+                                .clickable { isModePickerExpanded.value = true }
+                                .border(
+                                    width = 1.dp,
+                                    color = Color.Gray,
+                                    shape = RoundedCornerShape(5.dp)
+                                )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Mode", modifier = Modifier.padding(8.dp))
+                                Spacer(Modifier.weight(1f))
+                                Text(state.value.mode.title, modifier = Modifier.padding(8.dp))
+                            }
+                            DropdownMenu(
+                                expanded = isModePickerExpanded.value,
+                                onDismissRequest = { isModePickerExpanded.value = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                LampState.Mode.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.title) },
+                                        onClick = {
+                                            state.value = state.value.copy(mode = option)
+                                            isModePickerExpanded.value = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        networkService.stop()
     }
 }
