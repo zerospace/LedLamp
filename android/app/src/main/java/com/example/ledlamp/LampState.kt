@@ -11,16 +11,26 @@ data class LampState(
         RAINBOW("\uD83C\uDF08 Rainbow")
     }
 
+    val bytes: ByteArray
+        get() {
+            return byteArrayOf(
+                red.toInt().toByte(),
+                green.toInt().toByte(),
+                blue.toInt().toByte(),
+                if (mode == Mode.COLOR) 0.toByte() else 1.toByte()
+            )
+        }
+
     companion object {
         fun deserialize(data: ByteArray): LampState {
             var offset = 0
-            val red = data[offset]
+            val red = data[offset].toUByte()
             offset++
-            val green = data[offset]
+            val green = data[offset].toUByte()
             offset++
-            val blue = data[offset]
+            val blue = data[offset].toUByte()
             offset++
-            val mode = data[offset]
+            val mode = data[offset].toUByte()
             return LampState(
                 red = red.toFloat(),
                 green = green.toFloat(),

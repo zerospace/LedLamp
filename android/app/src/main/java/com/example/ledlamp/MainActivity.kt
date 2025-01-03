@@ -1,7 +1,7 @@
 package com.example.ledlamp
 
-import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,7 +20,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,14 +28,18 @@ import com.example.ledlamp.ui.theme.LedLampTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import androidx.lifecycle.Observer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private lateinit var networkService: NetworkService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         networkService = NetworkService(this)
         networkService.search()
 
@@ -47,6 +50,13 @@ class MainActivity : ComponentActivity() {
                     val color = remember { mutableStateOf(Color.Red) }
                     val state = remember { mutableStateOf(LampState()) }
                     var isModePickerExpanded = remember { mutableStateOf(false) }
+
+                    val observer = Observer<LampState> { newState ->
+                        state.value = newState
+                        color.value = Color(newState.red / 255f, newState.green / 255f, newState.blue /255f)
+                        Log.d("NetworkService", "Observe state: $newState")
+                    }
+                    networkService.state.observe(this, observer)
 
                     Column(
                         modifier = Modifier
@@ -61,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             CircularColorPicker(color) { newColor ->
                                 state.value = state.value.copy(red = newColor.red * 255, green = newColor.green * 255, blue = newColor.blue * 255)
+                                send(state.value)
                             }
                         }
 
@@ -73,7 +84,9 @@ class MainActivity : ComponentActivity() {
                                     state.value = state.value.copy(red = value)
                                     color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
-                                onValueChangeFinished =  {}
+                                onValueChangeFinished = {
+                                    send(state.value)
+                                }
                             )
                         }
 
@@ -86,7 +99,9 @@ class MainActivity : ComponentActivity() {
                                     state.value = state.value.copy(green = value)
                                     color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
-                                onValueChangeFinished =  {}
+                                onValueChangeFinished = {
+                                    send(state.value)
+                                }
                             )
                         }
 
@@ -99,7 +114,9 @@ class MainActivity : ComponentActivity() {
                                     state.value = state.value.copy(blue = value)
                                     color.value = Color(state.value.red / 255f, state.value.green / 255f, state.value.blue /255f)
                                 },
-                                onValueChangeFinished =  {}
+                                onValueChangeFinished = {
+                                    send(state.value)
+                                }
                             )
                         }
 
@@ -129,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                         text = { Text(option.title) },
                                         onClick = {
                                             state.value = state.value.copy(mode = option)
+                                            send(state.value)
                                             isModePickerExpanded.value = false
                                         }
                                     )
@@ -144,5 +162,13 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         networkService.stop()
+    }
+
+    private fun send(state: LampState) {
+        CoroutineScope(Dispatchers.Main).launch {
+            withContext(Dispatchers.IO) {
+                networkService.command(command = LedProtocol.Command.SET, data = state.bytes)
+            }
+        }
     }
 }
