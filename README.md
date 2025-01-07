@@ -4,12 +4,8 @@ A simple project using the ESP8266 to control a WS2812b LED strip with iOS and A
 
 The wiring follows the default setup.
 
-<p align="center">
-  <img src="images/wiring.png" width="500">
-  <br>
+<img src="images/wiring.png" width="500">
 
-  | iOS                                    | Android |
-  | :------------------------------------: | :----------------------------------------: |
-  | <img src="images/ios.png" width="200"> | <img src="images/android.png" width="200"> |
-  
-</p>
+| iOS                                    | Android |
+| :------------------------------------: | :----------------------------------------: |
+| <img src="images/ios.png" width="200"> | <img src="images/android.png" width="200"> |
