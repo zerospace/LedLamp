@@ -7,7 +7,9 @@ The wiring follows the default setup.
 <p align="center">
   <img src="images/wiring.png" width="500">
   <br>
+
   | iOS                                    | Android |
   | :------------------------------------: | :----------------------------------------: |
   | <img src="images/ios.png" width="200"> | <img src="images/android.png" width="200"> |
+  
 </p>
