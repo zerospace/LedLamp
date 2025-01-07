@@ -46,6 +46,7 @@ struct ColorWheel: View {
 
 struct CircularColorPicker: View {
     @Binding var color: Color
+    var onDragEnded: () -> Void
     @State private var location: CGPoint = .zero
     
     @State private var hue: CGFloat = 0.0
@@ -72,6 +73,8 @@ struct CircularColorPicker: View {
                                 let angle = atan2(dy, dx)
                                 hue = (angle < 0 ? angle + 2 * .pi : angle) / (2 * .pi)
                                 color = Color(hue: hue, saturation: saturation, brightness: brightness)
+                            }).onEnded({ _ in
+                                onDragEnded()
                             }))
                     }
                 
@@ -96,6 +99,8 @@ struct CircularColorPicker: View {
                                 saturation = x / proxy.size.width
                                 brightness = 1 - (y / proxy.size.height)
                                 color = Color(hue: hue, saturation: saturation, brightness: brightness)
+                            }).onEnded({ _ in
+                                onDragEnded()
                             }))
                     }
                 }

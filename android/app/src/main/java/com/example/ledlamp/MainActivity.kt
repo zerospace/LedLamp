@@ -69,9 +69,11 @@ class MainActivity : ComponentActivity() {
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularColorPicker(color) { newColor ->
+                            CircularColorPicker(color) { newColor, isEnded ->
                                 state.value = state.value.copy(red = newColor.red * 255, green = newColor.green * 255, blue = newColor.blue * 255)
-                                send(state.value)
+                                if (isEnded) {
+                                    send(state.value)
+                                }
                             }
                         }
 

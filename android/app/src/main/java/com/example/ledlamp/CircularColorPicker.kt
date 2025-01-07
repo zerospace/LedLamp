@@ -71,7 +71,7 @@ fun ColorWheel(size: Float) {
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
-fun CircularColorPicker(color: MutableState<Color>, onColorSelected: (Color) -> Unit) {
+fun CircularColorPicker(color: MutableState<Color>, onColorSelected: (Color, Boolean) -> Unit) {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(color.value.toArgb(), hsv)
     var hue = hsv[0] / 360
@@ -92,7 +92,7 @@ fun CircularColorPicker(color: MutableState<Color>, onColorSelected: (Color) -> 
             Canvas(
                 modifier = Modifier.fillMaxSize()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, _ ->
+                        detectDragGestures(onDrag = { change, _ ->
                             val dx = change.position.x - center.x
                             val dy = change.position.y - center.y
                             val angle = atan2(dy, dx)
@@ -101,8 +101,11 @@ fun CircularColorPicker(color: MutableState<Color>, onColorSelected: (Color) -> 
                             else
                                 angle / TWO_PI
                             color.value = Color.hsv(hue * 360, saturation, brightness)
-                            onColorSelected(color.value)
-                        }
+                            onColorSelected(color.value, false)
+
+                        }, onDragEnd = {
+                            onColorSelected(color.value, true)
+                        })
                     }
             ) {
                 val selectorOffset = Offset(
@@ -159,14 +162,16 @@ fun CircularColorPicker(color: MutableState<Color>, onColorSelected: (Color) -> 
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, _ ->
+                        detectDragGestures(onDrag = { change, _ ->
                             val x = max(0f, min(change.position.x, saturationBoxSize))
                             val y = max(0f, min(change.position.y, saturationBoxSize))
                             saturation = x / saturationBoxSize
                             brightness = 1 - (y / saturationBoxSize)
                             color.value = Color.hsv(hue * 360, saturation, brightness)
-                            onColorSelected(color.value)
-                        }
+                            onColorSelected(color.value, false)
+                        }, onDragEnd = {
+                            onColorSelected(color.value, true)
+                        })
                     }
             ) {
                 drawCircle(
